@@ -1,0 +1,10 @@
+# 便宜上の compose（必須ではない: ルート Dockerfile 単体で完結）
+services:
+  xlspec2md:
+    build: .
+    container_name: xlspec2md
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data        # ホスト側の永続化ディレクトリに変更可
+    restart: unless-stopped

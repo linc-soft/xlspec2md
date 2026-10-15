@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+.pytest_cache/
+
+# データ & 産物（ローカル実行分）
+data/
+out/
+tests/golden_out/
+
+# 社内設計書（公開リポジトリに上げてはいけない実データ）
+tests/fixtures/*.xlsx
+
+# フロントエンド
+frontend/node_modules/
+frontend/dist/
+
+# その他
+.git
+server.log

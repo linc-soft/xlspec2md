@@ -1,0 +1,45 @@
+# 方言設定: 画面設計書（基本設計書_*.xlsx）
+dialect: screen_book
+
+sheet_roles:
+  画面イメージ: gajou        # 画面レイアウト
+  機能仕様: shiyou           # 項目定義 + 特記事項
+  機能処理: shori            # イベント処理
+  データ更新表: koushin      # データ更新
+  変更履歴: ignore           # 版歴（対象外）
+  # 上記以外のシートは verbatim 転記 + 警告
+
+gajou:
+  first_screen_row: 11            # 先頭画面の開始行（C11:DZ156 規約）
+  header_end_row: 8               # ヘッダメタ領域の終了行
+  legend_values: ["＿", "□", "×"]  # 凡例（除外）
+  title_markers: ["■"]            # タイトルバー先頭記号
+  group_marker: "⊟"               # グループボックス先頭記号
+  screen_marker:
+    column: 3                     # C 列
+    patterns: ["タブ", "メニュー"]  # 後続画面の開始マーカ（これを含む行から新画面）
+
+shiyou:
+  anchors:
+    item_def: "項目定義"          # ⅱ．項目定義
+    notes: "特記事項"             # ⅲ．特記事項
+  header_keywords:                # 項目定義表の列キーワード（マージレンジ先頭セルで照合）
+    item_group: ["項目グループ"]   # オプション列（無い設計書もある）
+    item_id: ["項目ID"]           # オプション列
+    category: ["分類"]
+    name: ["項目名"]
+    modes: ["新規", "修正", "照会", "選択"]
+    required: ["必須"]
+    initial: ["初期値"]
+    datasource: ["データソース"]
+    list_setting: ["リスト設定"]
+    remark: ["備考"]
+
+shori:
+  anchor: "画面イベント定義"
+  event_column: 2                 # B 列にイベント名
+
+koushin:
+  field_header: "フィールド名"    # 存在すれば行列形式、なければ散文形式
+  dml_keywords: ["INSERT", "UPDATE", "DELETE", "新規", "修正", "削除"]
+  max_blank_break: 2              # これだけ空行が続いたら表終了

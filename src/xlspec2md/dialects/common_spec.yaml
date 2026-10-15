@@ -1,0 +1,15 @@
+# 方言設定: 共通仕様書（01_共通仕様書.xlsx）
+dialect: common_spec
+
+sheet_roles:
+  共通仕様書: main       # メイン節構造シート
+  修正履歴: ignore
+  # 上記以外（バックアップ等）は verbatim 転記 + 警告
+
+main_sheet: 共通仕様書
+section:
+  # 節見出し: 先頭が全角/半角数字+ドット、短い行（例: ５．画面項目制御 / 1.金額の…）
+  pattern: '^[０-９0-9]+[．.]'
+  max_len: 50
+  heading_columns: [2, 3]     # B/C 列を見出し候補とする（A 列は取らない）
+  top_level_max: 30           # 全角２桁番号（１０．〜）も H2 扱い
