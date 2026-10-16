@@ -22,9 +22,9 @@ TEMPLATE = """\
 
 `{{ s.source if s.source else '画面イメージ' }}!行 {{ s.start_row }}-{{ s.end_row }}` ｜ サイズ: {{ s.width_px }}x{{ s.height_px }}px
 
-| # | コンポーネント | 種別 | x | y | w | h | ソース |
-|---|----------------|------|---|---|---|---|--------|
-{% for c in s.components %}| {{ loop.index }} | {{ c.name | replace('|', '｜') | truncate(40) }} | {{ c.type }} | {{ c.x }} | {{ c.y }} | {{ c.w }} | {{ c.h }} | `{{ c.range }}` |
+| # | コンポーネント | 種別 | x | y | w | h | コンテナ | rx | ry | ソース |
+|---|----------------|------|---|---|---|---|----------|----|----|--------|
+{% for c in s.components %}| {{ loop.index }} | {{ c.name | replace('|', '｜') | truncate(40) }} | {{ c.type }} | {{ c.x }} | {{ c.y }} | {{ c.w }} | {{ c.h }} | {{ c.container }} | {{ c.rx }} | {{ c.ry }} | `{{ c.range }}` |
 {% endfor %}
 {% endfor %}
 {% endif %}

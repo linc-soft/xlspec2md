@@ -12,9 +12,14 @@ sheet_roles:
 gajou:
   first_screen_row: 11            # 先頭画面の開始行（C11:DZ156 規約）
   header_end_row: 8               # ヘッダメタ領域の終了行
+  screen_area:                    # 画面キャンバス（C11:DZ156 規約。単画面シートの下端・全画面の右端に使用）
+    end_row: 156
+    end_col: "DZ"                 # 列記号
   legend_values: ["＿", "□", "×"]  # 凡例（除外）
   title_markers: ["■"]            # タイトルバー先頭記号
   group_marker: "⊟"               # グループボックス先頭記号
+  group_inset_col: 1              # グループボックス罫線は ⊟ ラベルより左に何列あるか（相対座標の原点補正）
+  group_inset_row: 1              # 同上（上方向）
   screen_marker:
     column: 3                     # C 列
     patterns: ["タブ", "メニュー"]  # 後続画面の開始マーカ（これを含む行から新画面）

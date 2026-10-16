@@ -22,6 +22,9 @@ class Component:
     h: int
     range: str          # sheet!C11:D15
     source: str = ""    # sheet 名
+    container: str = ""     # 所属グループ名（group 型コンポーネントの name）
+    rx: int = -1            # コンテナ内相対 x（コンテナ無しなら -1）
+    ry: int = -1            # コンテナ内相対 y
 
 
 @dataclass

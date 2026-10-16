@@ -78,15 +78,41 @@ def parse_gajou(sv: SheetView, cfg: dict, warnings: list[str]) -> tuple[list[Scr
             annotations.append((name, r, end))
     ann_ranges = [(r0, r1) for _, r0, r1 in annotations]
 
+    # 画面キャンバス（C11:DZ156 規約）。単画面シートの下端・全画面の幅の決定に使う。
+    area = cfg.get("screen_area") or {}
+    canvas_end_row = area.get("end_row")
+    from openpyxl.utils import column_index_from_string
+    canvas_end_col = column_index_from_string(area["end_col"]) if area.get("end_col") else None
+
+    # 注釈ブロックを除いた内容のある最終行（単画面シートの下端決定用）
+    def _not_ann(r: int) -> bool:
+        return not any(r0 <= r <= r1 for r0, r1 in ann_ranges)
+
+    last_content_excl = max((r for r, _, _ in sv.iter_nonempty(min_row=first_row) if _not_ann(r)),
+                            default=first_row)
+
+    # ---- コンテナ判定用のグループ情報（罫線は ⊟ ラベルより上左に inset 分だけ外側）----
+    inset_x = cfg.get("group_inset_col", 1) * 10
+    inset_y = cfg.get("group_inset_row", 1) * 5
+
     # 各画面の終了行 = 次境界-1、最後は内容のある最終行
     screens: list[Screen] = []
     legend = set(cfg["legend_values"])
 
     for i, (marker_name, start) in enumerate(bounds):
-        end = (bounds[i + 1][1] - 1) if i + 1 < len(bounds) else last_content_row
+        if i + 1 < len(bounds):
+            end = bounds[i + 1][1] - 1
+        else:
+            # 単画面（末尾）シート: 注釈を除いた内容末行とキャンバス下端の大きい方
+            end = max(last_content_excl, canvas_end_row or last_content_excl)
         name = func_name if i == 0 else marker_name
+        # キャンバス右端が定義されていれば幅はそこから決める（シートのゴミ列に惑わされない）
+        if canvas_end_col:
+            width_px = (canvas_end_col - 3 + 1) * 10
+        else:
+            width_px = col_px(sv.ws.max_column + 1)
         screen = Screen(name=name, start_row=start, end_row=end,
-                        width_px=col_px(sv.ws.max_column + 1), height_px=row_px(end + 1, start))
+                        width_px=width_px, height_px=row_px(end + 1, start))
         # ---- コンポーネント抽出 ----
         seen_ranges: set[str] = set()
         for r in range(start, end + 1):
@@ -115,9 +141,29 @@ def parse_gajou(sv: SheetView, cfg: dict, warnings: list[str]) -> tuple[list[Scr
                 )
                 screen.components.append(comp)
         if screen.components:
+            _assign_containers(screen, inset_x, inset_y)
             screens.append(screen)
         else:
             warnings.append(f"画面「{name}」(row {start}-{end}) にコンポーネントがありません")
     if not screens:
         warnings.append("画面イメージに画面が検出されませんでした")
     return screens, func_name, annotations
+
+
+def _assign_containers(screen: Screen, inset_x: int, inset_y: int) -> None:
+    """group 型コンポーネントをコンテナとみなし、内包する他コンポーネントに
+    コンテナ名とコンテナ内相対座標を設定する。
+    グループ罫線の原点 = ⊟ ラベルの座標 - inset（罫線はラベルより外側にあるため）。"""
+    groups = [(g.x - inset_x, g.y - inset_y, g) for g in screen.components if g.type == "group"]
+    for comp in screen.components:
+        if comp.type == "group":
+            continue
+        # 原点が自分より上左にあるグループのうち、最も近い（最も内側の）ものを親とする
+        candidates = [(gx, gy, g) for gx, gy, g in groups
+                      if comp.x >= gx and comp.y >= gy]
+        if not candidates:
+            continue
+        gx, gy, g = max(candidates, key=lambda t: (t[1], t[0]))
+        comp.container = g.name
+        comp.rx = comp.x - gx
+        comp.ry = comp.y - gy
