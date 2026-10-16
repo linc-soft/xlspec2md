@@ -2,9 +2,10 @@
 """IR → Markdown レンダリング（Jinja2）。"""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
-from jinja2 import Environment, BaseLoader, select_autoescape
+from jinja2 import Environment, BaseLoader
 
 from ..models import DocumentIR
 
@@ -63,9 +64,7 @@ TEMPLATE = """\
 
 {% if du.kind == 'matrix' %}
 | {{ du.columns | join(' | ') }} |
-|{% for c in du.columns %}---|{% endfor %}
-{% for row in du.rows %}| {% for col in du.columns %}{{ row.get(col, '') | replace('|','｜') | replace('\n', '<br>') | truncate(50) }} | {% endfor %}
-{% endfor %}
+|{% for c in du.columns %}---|{% endfor %}{{ '\n' }}{% for row in du.rows %}| {% for col in du.columns %}{{ row.get(col, '') | replace('|','｜') | replace('\n', '<br>') | truncate(50) }} | {% endfor %}{{ '\n' }}{% endfor %}
 {% else %}
 {% for line in du.lines %}{% for c in line %} {{ c.text | replace('|','｜') }} {% endfor %}{{ '\n' }}{% endfor %}
 {% endif %}
@@ -99,7 +98,7 @@ TEMPLATE = """\
 {% endif %}
 """
 
-_env = Environment(loader=BaseLoader(), autoescape=select_autoescape(default=False),
+_env = Environment(loader=BaseLoader(), autoescape=False,
                    trim_blocks=True, lstrip_blocks=True, keep_trailing_newline=True)
 
 
@@ -110,7 +109,8 @@ def render_markdown(ir: DocumentIR, xlsx_path: str = "") -> str:
             if m not in mode_cols:
                 mode_cols.append(m)
     meta = dict(ir.meta)
-    meta.setdefault("filename", Path(xlsx_path).name if xlsx_path else "")
+    # ストレージ上のバージョン接頭辞（v3__foo.xlsx）は見出しから除く
+    meta.setdefault("filename", re.sub(r"^v\d+__", "", Path(xlsx_path).name) if xlsx_path else "")
     return _env.from_string(TEMPLATE).render(
         ir=ir, meta=meta, mode_cols=mode_cols,
         has_group=any(d.item_group for d in ir.item_defs),

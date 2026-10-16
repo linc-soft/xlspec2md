@@ -22,6 +22,7 @@ export const api = {
     return request(`/api/projects/${pid}/documents`, { method: 'POST', body: f })
   },
   docVersions: (docId) => request(`/api/documents/${docId}/versions`),
+  docDiff: (docId, va, vb) => request(`/api/documents/${docId}/diff?va=${va}&vb=${vb}`),
   createBuild: (pid, versionIds = []) => {
     const f = new FormData(); f.append('version_ids', versionIds.join(','))
     return request(`/api/projects/${pid}/builds`, { method: 'POST', body: f })
@@ -31,6 +32,5 @@ export const api = {
   buildFile: (bid, path) => request(`/api/builds/${bid}/file?path=${encodeURIComponent(path)}`),
   buildFileUrl: (bid, path, download = false) =>
     `/api/builds/${bid}/file?path=${encodeURIComponent(path)}${download ? '&download=1' : ''}`,
-  buildZipUrl: (bid) => `/api/builds/${bid}/zip`,
-  buildDiff: (bid, other) => request(`/api/builds/${bid}/diff?other=${other}`)
+  buildZipUrl: (bid) => `/api/builds/${bid}/zip`
 }

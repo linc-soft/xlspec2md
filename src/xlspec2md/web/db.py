@@ -49,6 +49,7 @@ def init_db(db_path: Path) -> None:
       filename TEXT NOT NULL,
       stored_path TEXT NOT NULL,
       uploaded_at TEXT NOT NULL,
+      converted INTEGER NOT NULL DEFAULT 0,   -- 1 = 変換済み
       UNIQUE(document_id, version_no)
     );
     CREATE TABLE IF NOT EXISTS builds(
@@ -61,6 +62,11 @@ def init_db(db_path: Path) -> None:
       result_json TEXT
     );
     """)
+    # 既存 DB へのカラム追加（CREATE TABLE IF NOT EXISTS では既存表は更新されないため）
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(versions)")]
+    if "converted" not in cols:
+        conn.execute("ALTER TABLE versions ADD COLUMN converted INTEGER NOT NULL DEFAULT 0")
+        conn.commit()
 
 
 def q(conn, sql, params=()):

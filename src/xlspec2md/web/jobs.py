@@ -12,7 +12,7 @@ from . import db, storage
 def _current_versions(conn, project_id: int) -> list:
     """各ドキュメントの最新バージョンを 1 本ずつ返す。"""
     rows = db.q(conn, """
-      SELECT v.id, v.filename, v.stored_path, d.kind, d.name AS doc_name, v.version_no
+      SELECT v.id, v.filename, v.stored_path, d.kind, d.name AS doc_name, v.version_no, v.converted
       FROM versions v
       JOIN documents d ON d.id = v.document_id
       JOIN (SELECT document_id, MAX(version_no) AS mx FROM versions GROUP BY document_id) t
@@ -22,12 +22,17 @@ def _current_versions(conn, project_id: int) -> list:
     return rows
 
 
+def _pending_versions(conn, project_id: int) -> list:
+    """各ドキュメントの最新バージョンのうち、未変換のものだけ返す。"""
+    return [r for r in _current_versions(conn, project_id) if not r["converted"]]
+
+
 def _selected_versions(conn, version_ids: list[int]) -> list:
     if not version_ids:
         return []
     marks = ",".join("?" * len(version_ids))
     return db.q(conn, f"""
-      SELECT v.id, v.filename, v.stored_path, d.kind, d.name AS doc_name, v.version_no
+      SELECT v.id, v.filename, v.stored_path, d.kind, d.name AS doc_name, v.version_no, v.converted
       FROM versions v JOIN documents d ON d.id = v.document_id
       WHERE v.id IN ({marks})
     """, tuple(version_ids))
@@ -39,8 +44,9 @@ def run_build(build_id: int) -> None:
     b = db.one(conn, "SELECT * FROM builds WHERE id=?", (build_id,))
     proj = db.one(conn, "SELECT * FROM projects WHERE id=?", (b["project_id"],))
     req = json.loads(b["result_json"] or "{}")
+    # 指定が無い場合は「未変換の最新バージョン」のみ変換対象
     versions = (_selected_versions(conn, req.get("version_ids", []))
-                or _current_versions(conn, b["project_id"]))
+                or _pending_versions(conn, b["project_id"]))
 
     out_root = storage.build_dir(proj["slug"], build_id)
     out_root.mkdir(parents=True, exist_ok=True)
@@ -65,6 +71,7 @@ def run_build(build_id: int) -> None:
                 "version_id": v["id"], "doc_name": v["doc_name"], "kind": v["kind"],
                 "version_no": v["version_no"], "files": files, "md": md_rel,
             })
+            db.execute(conn, "UPDATE versions SET converted=1 WHERE id=?", (v["id"],))
         db.execute(conn, "UPDATE builds SET status='done', finished_at=?, result_json=? WHERE id=?",
                    (db.now(), json.dumps({"documents": results}, ensure_ascii=False), build_id))
     except Exception as e:

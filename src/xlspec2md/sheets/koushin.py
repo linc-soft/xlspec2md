@@ -16,6 +16,13 @@ def parse_koushin(sv: SheetView, cfg: dict, warnings: list[str]) -> list[DataUpd
         if len(cells) >= 2:
             action, table = cells[0], cells[1]
             break
+    if not action:
+        # 2セル行が無い形式（例: 検収データ取込）は先頭の非空セルを action とみなす
+        for r in range(4, min(10, sv.ws.max_row) + 1):
+            cells = [str(v).strip() for _, _, v in sv.iter_nonempty(min_row=r, max_row=r, min_col=3, max_col=30)]
+            if cells:
+                action = cells[0]
+                break
 
     fhit = sv.find(cfg["field_header"])
     if fhit is None:
@@ -36,13 +43,21 @@ def parse_koushin(sv: SheetView, cfg: dict, warnings: list[str]) -> list[DataUpd
         return result
 
     # ---- 行列形式（ヘッダ前に散文手順があれば別エントリで保持）----
+    def _is_meta_row(texts: list[str]) -> bool:
+        """action/table のメタ行、または DML 列見出し行（matrix 側で既に表現済みのため転記不要）。"""
+        if not texts:
+            return True
+        if all(t and t in (action, table) for t in texts):
+            return True
+        return all(any(k in t for k in cfg["dml_keywords"]) for t in texts)
+
     if fhit[0] > 6:
         prose = DataUpdate(kind="prose", action=action, table=table, source=sv.name)
         for r in range(5, fhit[0]):
-            cells = [CellRef(sv.coord(r, c), str(v)) for _, c, v in
-                     sv.iter_nonempty(min_row=r, max_row=r, min_col=3)]
-            if cells:
-                prose.lines.append(cells)
+            raw = [(c, str(v).strip()) for _, c, v in
+                   sv.iter_nonempty(min_row=r, max_row=r, min_col=3)]
+            if raw and not _is_meta_row([t for _, t in raw]):
+                prose.lines.append([CellRef(sv.coord(r, c), t) for c, t in raw])
         if prose.lines:
             result.append(prose)
 

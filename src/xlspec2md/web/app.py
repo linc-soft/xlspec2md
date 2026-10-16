@@ -8,6 +8,8 @@ from __future__ import annotations
 import io
 import json
 import os
+import shutil
+import tempfile
 import zipfile
 from pathlib import Path
 
@@ -15,8 +17,9 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from ..engine import convert_file
 from . import db, jobs, storage
-from .diffing import diff_builds
+from .diffing import diff_md_dirs
 
 DOC_KINDS = {"common_spec", "design_book"}
 
@@ -54,7 +57,6 @@ def create_app(data_dir: str | None = None) -> FastAPI:
         if not row:
             raise HTTPException(404)
         db.execute(conn(), "DELETE FROM projects WHERE id=?", (pid,))
-        import shutil
         shutil.rmtree(storage.project_dir(row["slug"]), ignore_errors=True)
         return {"deleted": pid}
 
@@ -64,8 +66,13 @@ def create_app(data_dir: str | None = None) -> FastAPI:
         if not proj:
             raise HTTPException(404)
         docs = db.q(conn(), """
-          SELECT d.*, (SELECT MAX(version_no) FROM versions v WHERE v.document_id=d.id) AS current_version,
-                        (SELECT COUNT(*) FROM versions v WHERE v.document_id=d.id) AS version_count
+          SELECT d.*,
+            (SELECT MAX(version_no) FROM versions v WHERE v.document_id=d.id) AS current_version,
+            (SELECT COUNT(*) FROM versions v WHERE v.document_id=d.id) AS version_count,
+            (SELECT v2.id FROM versions v2 WHERE v2.document_id=d.id
+             ORDER BY v2.version_no DESC LIMIT 1) AS current_version_id,
+            (SELECT v2.converted FROM versions v2 WHERE v2.document_id=d.id
+             ORDER BY v2.version_no DESC LIMIT 1) AS current_converted
           FROM documents d WHERE d.project_id=? ORDER BY d.kind, d.name
         """, (pid,))
         builds = db.q(conn(), "SELECT * FROM builds WHERE project_id=? ORDER BY id DESC LIMIT 20", (pid,))
@@ -180,16 +187,29 @@ def create_app(data_dir: str | None = None) -> FastAPI:
             headers={"Content-Disposition":
                      f"attachment; filename=build{bid}.zip; filename*=UTF-8''{quote(name)}"})
 
-    @app.get("/api/builds/{bid}/diff")
-    def build_diff(bid: int, other: int):
-        a = db.one(conn(), "SELECT * FROM builds WHERE id=?", (bid,))
-        b = db.one(conn(), "SELECT * FROM builds WHERE id=?", (other,))
-        if not a or not b:
+    @app.get("/api/documents/{doc_id}/diff")
+    def doc_version_diff(doc_id: int, va: int, vb: int):
+        """同一ドキュメントの 2 バージョンをそれぞれ変換し、産物 .md 同士の差分を返す。"""
+        doc = db.one(conn(), "SELECT * FROM documents WHERE id=?", (doc_id,))
+        if not doc:
             raise HTTPException(404)
-        if a["project_id"] != b["project_id"]:
-            raise HTTPException(400, "同一プロジェクトのビルド同士のみ比較可")
-        diffs = diff_builds(_build_root(a), _build_root(b))
-        return {"a": bid, "b": other, "files": sorted(diffs.keys()), "diffs": diffs}
+        vers = {r["id"]: r for r in
+                db.q(conn(), "SELECT * FROM versions WHERE id IN (?,?)", (va, vb))}
+        if va not in vers or vb not in vers:
+            raise HTTPException(404, "バージョンが見つかりません")
+        if any(r["document_id"] != doc_id for r in vers.values()):
+            raise HTTPException(400, "同一ドキュメントのバージョン同士のみ比較可")
+        tmp = Path(tempfile.mkdtemp(prefix="xlspec2md_diff_"))
+        try:
+            dirs = []
+            for vid in (va, vb):
+                out = tmp / str(vid)
+                convert_file(vers[vid]["stored_path"], str(out), stem=doc["name"])
+                dirs.append(out)
+            diffs = diff_md_dirs(dirs[0], dirs[1])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        return {"va": va, "vb": vb, "files": sorted(diffs.keys()), "diffs": diffs}
 
     # ---------------- フロントエンド ----------------
     dist = Path(__file__).resolve().parents[3] / "frontend" / "dist"

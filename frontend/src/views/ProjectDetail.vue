@@ -16,8 +16,8 @@
                      :on-change="onFileChosen">
             <el-button type="primary">アップロード（新規バージョン）</el-button>
           </el-upload>
-          <el-button type="success" :disabled="!detail?.documents?.length"
-                     :loading="building" @click="build">変換実行</el-button>
+          <el-button type="success" :disabled="!pendingCount"
+                     :loading="building" @click="build">変換実行（未変換 {{ pendingCount }} 件）</el-button>
         </div>
 
         <el-table :data="detail?.documents || []" row-key="id">
@@ -29,8 +29,23 @@
             </template>
           </el-table-column>
           <el-table-column prop="name" label="ファイル" min-width="220" />
+          <el-table-column label="状態" width="90">
+            <template #default="{ row }">
+              <el-tag :type="row.current_converted ? 'success' : 'danger'">
+                {{ row.current_converted ? '変換済' : '未変換' }}
+              </el-tag>
+            </template>
+          </el-table-column>
           <el-table-column label="最新版" width="80" prop="current_version" />
           <el-table-column label="版数" width="70" prop="version_count" />
+          <el-table-column label="" width="110">
+            <template #default="{ row }">
+              <el-button size="small" type="primary" plain
+                         :disabled="!row.current_version_id || !!row.current_converted"
+                         :loading="buildingDoc === row.id"
+                         @click="buildDoc(row)">変換実行</el-button>
+            </template>
+          </el-table-column>
           <el-table-column label="バージョン履歴" min-width="380">
             <template #default="{ row }">
               <VersionHistory :doc="row" />
@@ -56,12 +71,6 @@
           </el-table-column>
           <el-table-column prop="triggered_at" label="実行日時" width="220" />
           <el-table-column prop="error" label="エラー" min-width="200" />
-          <el-table-column label="" width="200">
-            <template #default="{ row }">
-              <DiffDialog v-if="row.status === 'done'" :build="row"
-                          :builds="doneBuilds" @done="load" />
-            </template>
-          </el-table-column>
         </el-table>
       </el-tab-pane>
     </el-tabs>
@@ -73,7 +82,6 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '../api'
 import VersionHistory from './VersionHistory.vue'
-import DiffDialog from './DiffDialog.vue'
 
 const props = defineProps({ projectId: { type: Number, required: true } })
 defineEmits(['back', 'open-build'])
@@ -83,9 +91,11 @@ const uploadKind = ref('design_book')
 const detail = ref(null)
 const loading = ref(false)
 const building = ref(false)
+const buildingDoc = ref(null)
 
-const doneBuilds = computed(() =>
-  (detail.value?.builds || []).filter(b => b.status === 'done'))
+const pendingCount = computed(() =>
+  (detail.value?.documents || [])
+    .filter(d => d.current_version_id && !d.current_converted).length)
 
 function statusType(s) {
   return { done: 'success', failed: 'danger', running: 'warning', queued: 'info' }[s] || 'info'
@@ -99,18 +109,34 @@ async function load() {
 async function onFileChosen(file) {
   try {
     await api.uploadDocument(props.projectId, uploadKind.value, file.raw)
-    ElMessage.success('アップロードしました')
+    ElMessage.success('アップロードしました（未変換状態で登録されました）')
     await load()
   } catch (e) { ElMessage.error(String(e)) }
 }
 
 async function build() {
+  const ids = (detail.value?.documents || [])
+    .filter(d => d.current_version_id && !d.current_converted)
+    .map(d => d.current_version_id)
+  if (!ids.length) {
+    ElMessage.info('未変換のファイルはありません')
+    return
+  }
   building.value = true
   try {
-    const b = await api.createBuild(props.projectId)
-    ElMessage.info(`ビルド #${b.id} を開始しました`)
+    const b = await api.createBuild(props.projectId, ids)
+    ElMessage.info(`ビルド #${b.id} を開始しました（未変換 ${ids.length} 件）`)
     await poll(b.id)
   } catch (e) { ElMessage.error(String(e)) } finally { building.value = false }
+}
+
+async function buildDoc(row) {
+  buildingDoc.value = row.id
+  try {
+    const b = await api.createBuild(props.projectId, [row.current_version_id])
+    ElMessage.info(`ビルド #${b.id} を開始しました: ${row.name}`)
+    await poll(b.id)
+  } catch (e) { ElMessage.error(String(e)) } finally { buildingDoc.value = null }
 }
 
 async function poll(bid) {
