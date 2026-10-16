@@ -18,8 +18,13 @@ gajou:
   legend_values: ["＿", "□", "×"]  # 凡例（除外）
   title_markers: ["■"]            # タイトルバー先頭記号
   group_marker: "⊟"               # グループボックス先頭記号
-  group_inset_col: 1              # グループボックス罫線は ⊟ ラベルより左に何列あるか（相対座標の原点補正）
+  group_inset_col: 1              # 罫線非検出時のフォールバック用: グループ罫線は ⊟ ラベルより左に何列あるか
   group_inset_row: 1              # 同上（上方向）
+  border_box:                     # 罫線矩形検出（GroupBox/Panel/Form 階層の構築に使用）
+    side_coverage: 0.8            # 辺の検出に必要な罫線カバレッジ
+    min_w_cols: 6                 # 検出する矩形の最小幅（列数）
+    min_h_rows: 4                 # 検出する矩形の最小高さ（行数）
+    label_row_pad: 2              # 箱の上辺が ⊟ ラベルブロック先頭・末尾から何行以内か
   screen_marker:
     column: 3                     # C 列
     patterns: ["タブ", "メニュー"]  # 後続画面の開始マーカ（これを含む行から新画面）

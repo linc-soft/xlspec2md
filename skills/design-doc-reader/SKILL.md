@@ -27,7 +27,7 @@ description: 基本設計書変換産物（Markdown / IR JSON / mockup HTML）�
 ## Markdown セクションの意味
 
 - `## 画面: <名前>` — 1 画面。複数タブ画面がある設計書では `xxタブ` ごとに独立した節がある
-- コンポーネント表の列: `種別`（title/group/button/checkbox/sort-or-dropdown/grid-row/text/block）、`x y w h`（ピクセル）、`ソース`（`画面イメージ!E22:N25` という原典セル座標）
+- コンポーネント表の列: `種別`（form/title/group/panel/button/checkbox/sort-or-dropdown/grid-row/text/block）、`x y w h`（ピクセル）、`コンテナ`（所属コンテナ名）、`rx ry`（コンテナ内相対座標）、`ソース`（`画面イメージ!E22:N25` という原典セル座標）
 - `## 項目定義` — 分類／項目名／モード別 I/O（新規・修正・照会・選択）／必須／初期値／データソース／リスト設定／備考。`I`=入力、`O`=出力
 - `## 特記事項` — 並び順・F キーマトリクス等。原文忠実転記（行末の `(C96)` はセル座標）
 - `## 機能処理（イベント）` — イベントごとの処理手順。`共通仕様に基づき…` の記述は共通仕様書への参照（下記）
@@ -38,7 +38,14 @@ description: 基本設計書変換産物（Markdown / IR JSON / mockup HTML）�
 ## 座標の解釈
 
 - 原則: **1 列 = 10px、1 行 = 5px**、画面左上が原点 (0,0)
-- 実装への換算例（WinForms）: `Label.Location = (x, y); Label.Size = (w, h);` そのまま使える
+- **コンテナ階層**: `form`（画面外枠）→ `group`（GroupBox）/ `panel`（ボタン領域等のラベル無し枠）→ コンポーネント
+  - `form` は画面全体（例: 1280x730）。タイトルバー（高さ 25px）は Form の chrome でありコンテナ割当の対象外
+  - `group`（⊟ ラベル）の `x,w` は罫線枠、`y` はラベルブロック頂点、`h` は罫線枠の高さ。罫線枠の実際の上端は `y + label_offset`（通常 10px。ラベル文字が罫線上端と重なるため）
+  - `container` 列が所属コンテナ名。`rx,ry` はコンテナ内相対座標で、各コンテナの原点は異なる:
+    - `group` 内: `rx = x - 罫線枠左`、`ry = y - (group.y + ラベルブロック高)`（= ラベル文字帯の下沿。GroupBox 直下の行は ry=5 になる）
+    - `panel` 内: `rx = x - panel.x`、`ry = y - panel.y`
+    - `form` 直接: `rx = x`、`ry = y - 25`（タイトルバー分を除く）
+- 実装への換算例（WinForms GroupBox）: `group.y + label_offset` が枠の ClientArea 上端。子コントロールは `(rx, ry + ラベル文字帯高)` に配置するか、`ry` をそのまま GroupBox 内座標の起点として使う
 - `sort-or-dropdown` は ▼/▽（プルダウン）または ▲/△（ソート）のインジケータ。直前の項目に付属するものとして実装する
 
 ## 「共通仕様に基づき」の解決ルール

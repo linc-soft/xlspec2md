@@ -15,16 +15,17 @@ class CellRef:
 @dataclass
 class Component:
     name: str
-    type: str           # title/group/button/checkbox/dropdown/sort/grid-row/text/block/legend
+    type: str           # form/title/group/panel/button/checkbox/dropdown/sort/grid-row/text/block/legend
     x: int              # px（画面左上原点）
     y: int
     w: int
     h: int
     range: str          # sheet!C11:D15
     source: str = ""    # sheet 名
-    container: str = ""     # 所属グループ名（group 型コンポーネントの name）
+    container: str = ""     # 所属コンテナ名（form/group/panel コンポーネントの name）
     rx: int = -1            # コンテナ内相対 x（コンテナ無しなら -1）
     ry: int = -1            # コンテナ内相対 y
+    label_offset: int = 0   # group のみ: 罫線枠上端が y から何 px 下にあるか（通常 10）
 
 
 @dataclass

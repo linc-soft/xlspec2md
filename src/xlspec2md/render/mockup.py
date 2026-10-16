@@ -7,7 +7,8 @@ import html
 from ..models import DocumentIR
 
 TYPE_COLOR = {
-    "title": "#1a5276", "group": "#117864", "button": "#b9770e",
+    "form": "#2c3e50", "title": "#1a5276", "group": "#117864", "panel": "#5d6d7e",
+    "button": "#b9770e",
     "checkbox": "#7d3c98", "dropdown": "#a93226", "sort-or-dropdown": "#a93226",
     "grid-row": "#707b7c", "text": "#212f3c", "block": "#95a5a6", "legend": "#95a5a6",
 }
@@ -23,6 +24,10 @@ nav a:hover { text-decoration:underline; }
 .c { position:absolute; border:1px solid #999; font-size:10px; overflow:hidden;
      padding:1px 3px; box-sizing:border-box; background:rgba(255,255,255,.85); white-space:pre-wrap; }
 .c .tag { position:absolute; top:0; right:2px; font-size:8px; opacity:.6; }
+.gbox { position:absolute; border:2px solid #117864; border-radius:4px;
+        background:rgba(17,120,100,.05); box-sizing:border-box; }
+.glabel { position:absolute; font-size:10px; font-weight:bold; color:#117864;
+          background:#fff; padding:0 4px; white-space:pre; }
 """
 
 _PAGE = """<!DOCTYPE html>
@@ -47,12 +52,26 @@ def render_mockup(ir: DocumentIR, xlsx_path: str = "") -> str:
         nav_parts.append(f'<a href="#{sid}">{html.escape(s.name)}</a>')
         comps = []
         for c in s.components:
+            if c.type == "form":
+                continue  # .screen 枠自体が Form
+            if c.type == "group" and c.label_offset:
+                # GroupBox: ラベル（ブロック頂点）+ 罫線枠（y+label_offset）
+                off = c.label_offset
+                comps.append(
+                    f'<div class="gbox" title="{html.escape(c.range)} [group]" '
+                    f'style="left:{c.x}px;top:{c.y + off}px;width:{c.w}px;height:{c.h}px"></div>')
+                comps.append(
+                    f'<div class="glabel" style="left:{c.x + 10}px;top:{c.y + 2}px">'
+                    f'{html.escape(c.name)}</div>')
+                continue
             color = TYPE_COLOR.get(c.type, "#212f3c")
             txt = html.escape(c.name) if c.name else ""
+            style = f'left:{c.x}px;top:{c.y}px;width:{c.w}px;height:{c.h}px;'
+            if c.type == "panel":
+                style += 'border-style:dashed;'
             comps.append(
                 f'<div class="c" title="{html.escape(c.range)} [{c.type}]" '
-                f'style="left:{c.x}px;top:{c.y}px;width:{c.w}px;height:{c.h}px;'
-                f'border-left:3px solid {color}">{txt}'
+                f'style="{style}border-left:3px solid {color}">{txt}'
                 f'<span class="tag">{c.type}</span></div>')
         screen_parts.append(_SCREEN.format(
             sid=sid, w=s.width_px, h=s.height_px, name=html.escape(s.name),
